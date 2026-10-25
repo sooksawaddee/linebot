@@ -1,4 +1,4 @@
-flask
-gunicorn
-line-bot-sdk
-groq
+flask>=3.0,<4.0
+gunicorn>=22.0,<24.0
+line-bot-sdk>=3.0,<4.0
+groq>=0.11
