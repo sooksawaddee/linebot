@@ -1,6 +1,6 @@
+
 import os
 from flask import Flask, request, abort
-
 from linebot.v3 import WebhookHandler
 from linebot.v3.exceptions import InvalidSignatureError
 from linebot.v3.messaging import (
@@ -8,22 +8,25 @@ from linebot.v3.messaging import (
     ReplyMessageRequest, TextMessage
 )
 from linebot.v3.webhooks import MessageEvent, TextMessageContent
+from groq import Groq
 
 app = Flask(__name__)
 
-# ดึงค่า Environment Variables
-channel_secret = os.getenv("LINE_CHANNEL_SECRET")
-channel_access_token = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
+handler = WebhookHandler(
+    os.environ["3a5de8696db014852d327a6b6e40ccad"]
+)
 
-if not channel_secret or not channel_access_token:
-    raise ValueError("กรุณาตั้งค่า LINE_CHANNEL_SECRET และ LINE_CHANNEL_ACCESS_TOKEN ใน Environment Variables")
+config = Configuration(
+    access_token=os.environ["R/JC9cpOtSuEkTqoXpWQ1qGCsvFo9OCLY0kivL/2tryUyFEUMB9SrhSWzoShYBa+BMfAgFU4QOMIpOFr8QP5J38XFI3EyaQ9HH/VhRQH/ljKpuUkWE1DtymuZI6RPnycb5tR1HpfMpuK/GxoCUIbOQdB04t89/1O/w1cDnyilFU="]
+)
 
-handler = WebhookHandler(channel_secret)
-config = Configuration(access_token=channel_access_token)
+groq_client = Groq(
+    api_key=os.environ["GROQ_API_KEY"]
+)
 
-@app.route("/")
+@app.route("/", methods=["GET"])
 def home():
-    return "LINE Webhook is running"
+    return "LINE Groq Bot is running!"
 
 @app.route("/callback", methods=["POST"])
 def callback():
@@ -39,20 +42,33 @@ def callback():
 
 @handler.add(MessageEvent, message=TextMessageContent)
 def handle_message(event):
-    with ApiClient(config) as api_client:
-        api = MessagingApi(api_client)
+    question = event.message.text
 
-        api.reply_message(
+    try:
+        result = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "ตอบคำถามเป็นภาษาไทยอย่างสุภาพและเข้าใจง่าย"
+                },
+                {
+                    "role": "user",
+                    "content": question
+                }
+            ],
+            max_tokens=500
+        )
+        answer = result.choices[0].message.content
+    except Exception:
+        app.logger.exception("Groq request failed")
+        answer = "ขออภัย ระบบ AI ขัดข้องชั่วคราว"
+
+    with ApiClient(config) as api_client:
+        line_api = MessagingApi(api_client)
+        line_api.reply_message(
             ReplyMessageRequest(
                 reply_token=event.reply_token,
-                messages=[
-                    TextMessage(
-                        text="สวัสดีครับ LINE Bot ทำงานแล้ว"
-                    )
-                ]
+                messages=[TextMessage(text=answer[:5000])]
             )
         )
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
