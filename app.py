@@ -33,28 +33,27 @@ logger = logging.getLogger(__name__)
 
 
 # ==========================================
-# 2. Environment Variables
+# 2. API Configuration
 # ==========================================
+# ใส่ API Keys ใน Render Environment
+# ไม่ต้องใส่รหัสจริงในไฟล์ Python
 
-LINE_CHANNEL_SECRET = os.getenv("3a5de8696db014852d327a6b6e40ccad")
-LINE_CHANNEL_ACCESS_TOKEN = os.getenv("R/JC9cpOtSuEkTqoXpWQ1qGCsvFo9OCLY0kivL/2tryUyFEUMB9SrhSWzoShYBa+BMfAgFU4QOMIpOFr8QP5J38XFI3EyaQ9HH/VhRQH/ljKpuUkWE1DtymuZI6RPnycb5tR1HpfMpuK/GxoCUIbOQdB04t89/1O/w1cDnyilFU=")
-GROQ_API_KEY = os.getenv("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")
+LINE_CHANNEL_SECRET = os.environ["LINE_CHANNEL_SECRET"]
 
-required_vars = {
-    "LINE_CHANNEL_SECRET": LINE_CHANNEL_SECRET,
-    "LINE_CHANNEL_ACCESS_TOKEN": LINE_CHANNEL_ACCESS_TOKEN,
-    "GROQ_API_KEY": GROQ_API_KEY
-}
+LINE_CHANNEL_ACCESS_TOKEN = os.environ[
+    "LINE_CHANNEL_ACCESS_TOKEN"
+]
 
-for name, value in required_vars.items():
-    if not value:
-        raise RuntimeError(
-            f"Missing environment variable: {name}"
-        )
+GROQ_API_KEY = os.environ["GROQ_API_KEY"]
+
+GROQ_MODEL = os.getenv(
+    "GROQ_MODEL",
+    "llama-3.3-70b-versatile"
+)
 
 
 # ==========================================
-# 3. LINE Messaging API Configuration
+# 3. LINE Messaging API
 # ==========================================
 
 handler = WebhookHandler(
@@ -76,21 +75,17 @@ groq_client = Groq(
     max_retries=0
 )
 
-GROQ_MODEL = os.getenv(
-    "GROQ_MODEL",
-    "llama-3.3-70b-versatile"
-)
-
 
 # ==========================================
-# 5. Home Route
+# 5. Home Page
 # ==========================================
 
 @app.route("/", methods=["GET"])
 def home():
+
     return {
         "status": "online",
-        "service": "LINE OA + Groq AI Bot",
+        "service": "LINE OA + Groq AI",
         "message": "LINE Groq Bot is running!"
     }, 200
 
@@ -130,6 +125,7 @@ def ask_groq(question):
 
     try:
         response = groq_client.chat.completions.create(
+
             model=GROQ_MODEL,
 
             messages=[
@@ -138,9 +134,9 @@ def ask_groq(question):
                     "content": (
                         "คุณเป็นผู้ช่วย AI ของ LINE Official Account "
                         "ตอบคำถามเป็นภาษาไทยอย่างสุภาพ "
-                        "ให้ข้อมูลถูกต้อง กระชับ และเข้าใจง่าย "
+                        "กระชับ ถูกต้อง และเข้าใจง่าย "
                         "หากไม่ทราบคำตอบ ให้บอกตามตรง "
-                        "ห้ามสร้างข้อมูลที่ไม่มีแหล่งอ้างอิง"
+                        "ห้ามสร้างข้อมูลที่ไม่มีอยู่จริง"
                     )
                 },
                 {
@@ -156,7 +152,7 @@ def ask_groq(question):
         answer = response.choices[0].message.content
 
         if not answer:
-            return "ขออภัย AI ไม่สามารถสร้างคำตอบได้"
+            return "ขออภัยครับ AI ไม่สามารถสร้างคำตอบได้"
 
         return answer.strip()
 
@@ -181,7 +177,7 @@ def handle_message(event):
 
     user_message = event.message.text.strip()
 
-    logger.info("Received LINE text message")
+    logger.info("Received LINE message")
 
     if not user_message:
         answer = "กรุณาพิมพ์คำถามที่ต้องการสอบถามครับ"
@@ -189,7 +185,7 @@ def handle_message(event):
     else:
         answer = ask_groq(user_message)
 
-    # LINE Text Message Limit
+    # จำกัดข้อความตาม LINE API
     answer = answer[:5000]
 
     try:
@@ -200,11 +196,8 @@ def handle_message(event):
             line_api.reply_message(
                 ReplyMessageRequest(
                     reply_token=event.reply_token,
-
                     messages=[
-                        TextMessage(
-                            text=answer
-                        )
+                        TextMessage(text=answer)
                     ]
                 )
             )
@@ -217,14 +210,12 @@ def handle_message(event):
 
 
 # ==========================================
-# 9. Run Application
+# 9. Run Flask Application
 # ==========================================
 
 if __name__ == "__main__":
 
-    port = int(
-        os.environ.get("PORT", 10000)
-    )
+    port = int(os.getenv("PORT", "10000"))
 
     app.run(
         host="0.0.0.0",
